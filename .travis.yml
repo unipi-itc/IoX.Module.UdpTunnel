@@ -1,0 +1,11 @@
+sudo: false
+language: csharp
+solution: IoX.Module.UdpTunnel.sln
+mono:
+  - nightly
+  - latest
+env:
+  - CFG=Debug
+  - CFG=Release
+script:
+  - xbuild /p:Configuration=$CFG IoX.Module.UdpTunnel.sln
