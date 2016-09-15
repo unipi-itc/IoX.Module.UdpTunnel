@@ -7,8 +7,7 @@ open Suave.EvReact
 open Utils
 
 type DispatcherConfiguration = {
-  DestinationHost: string
-  DestinationPort: int
+  Destinations: string
   ReadOnly: bool
   Verbose: bool
 }
@@ -30,6 +29,15 @@ type DispatcherModule(data: IModuleData<DispatcherConfiguration>) as this =
   let mutable statsIncoming = noPackets
   let mutable statsOutgoing = noPackets
 
+  let parseDests (s: string) =
+    let parseEndPoint (x: string) =
+      match x.Trim().Split(':') with
+      | [| host; port |] -> (host, System.Int32.Parse port)
+      | _ -> failwith "Malformed endpoint"
+    s.Split(',') |> Array.map(parseEndPoint)
+
+  let mutable dests = parseDests data.Configuration.Data.Destinations
+
   let stats (ctx: MsgRequestEventArgs<_>) =
     ctx.Result <- this.BuildJsonReply {
       ElapsedMS = stopwatch.ElapsedMilliseconds
@@ -42,16 +50,11 @@ type DispatcherModule(data: IModuleData<DispatcherConfiguration>) as this =
   // Message handling
   let socket = new System.Net.Sockets.UdpClient()
 
-  let sendMessage msg =
-    socket.Send(
-      msg,
-      msg.Length,
-      data.Configuration.Data.DestinationHost,
-      data.Configuration.Data.DestinationPort)
-    |> ignore
+  let sendMessage msg host port =
+    socket.Send(msg, msg.Length, host, port) |> ignore
     addPackets &statsOutgoing 1L msg.LongLength
     if data.Configuration.Data.Verbose then
-      printfn "Dispatched message of %A bytes: %s" msg.Length (asString msg)
+      printfn "Dispatched message of %A bytes to [%A:%A]: %s" msg.Length host port (asString msg)
 
   let sendData (ctx: HttpEventArgs) =
     ctx.Result <- Suave.Successful.OK ""
@@ -61,14 +64,18 @@ type DispatcherModule(data: IModuleData<DispatcherConfiguration>) as this =
     addPackets &statsIncoming 1L compressed.LongLength
     use compressedStream = new System.IO.MemoryStream(compressed)
     for msg in decompress compressedStream do
-      sendMessage msg
+      for (host, port) in dests do
+        sendMessage msg host port
 
   let updateConfig (ctx:MsgRequestEventArgs<_>) =
     if not data.Configuration.Data.ReadOnly then
-      data.Configuration.Data <- ctx.Message
-      data.Configuration.Save()
-      if data.Configuration.Data.Verbose then
-        printfn "Configuration updated"
+      try
+        dests <- parseDests data.Configuration.Data.Destinations
+        data.Configuration.Data <- ctx.Message
+        data.Configuration.Save()
+        if data.Configuration.Data.Verbose then
+          printfn "Configuration updated"
+      with e -> printfn "%A" e
     elif data.Configuration.Data.Verbose then
       printfn "Configuration update refused"
     ctx.Result <- Suave.Successful.OK ""
@@ -102,8 +109,7 @@ type DispatcherModule(data: IModuleData<DispatcherConfiguration>) as this =
     |> ignore
 
   static member DefaultConfig = {
-    DestinationHost = "192.0.2.3" // example destination
-    DestinationPort = 514
+    Destinations = "192.0.2.3:514, 192.0.2.4:5140" // example destinations
     ReadOnly = false
     Verbose = false
   }

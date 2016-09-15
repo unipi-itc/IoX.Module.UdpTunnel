@@ -286,8 +286,7 @@ $.getScript("https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.2.2/Chart.bundle.
   var DispatcherModule = React.createClass({
     render: function() {
       var configFields = [
-        "DestinationHost",
-        "DestinationPort",
+        "Destinations",
         "ReadOnly",
         "Verbose"
       ];
