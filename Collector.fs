@@ -94,7 +94,7 @@ type CollectorModule(data: IModuleData<CollectorConfiguration>) as this =
     // Some filesystems prohibit ':' in filenames
     let timeStamp = DateTime.UtcNow.ToString("o").Replace(":", "")
     let folder = Path.Combine(data.Path, "log")
-    let fileName = Path.Combine(folder, sprintf "udp-dump.%s.dat.gz" timeStamp)
+    let fileName = Path.Combine(folder, sprintf "udp-tunnel.%s.dump" timeStamp)
     Directory.CreateDirectory(folder) |> ignore
     storage <- new Compressor(File.Create(fileName))
     if data.Configuration.Data.Verbose then
